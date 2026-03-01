@@ -1,50 +1,258 @@
-[프로젝트 개요]
-해외 파트너사(에이전트)가 웹사이트에서 한국 도착 수입 화물의 내륙 운송비를 실시간으로 조회하고 견적서를 출력할 수 있는 시스템 구축
+# Inland Freight Inquiry System
 
-[프로젝트 배경 및 목표]
-현재 이메일/메신저로 진행되는 내륙 운송비 견적 업무를 자동화하여 업무 효율을 높이고자 합니다. 특히 화물의 규격(사이즈)에 따른 차량 배차 로직을 시스템화하여, 해외 에이전트가 시차 없이 정확한 견적을 받을 수 있도록 하는 것이 목표입니다.
+해외 파트너사(에이전트)가 한국 도착 수입 화물의 내륙 운송비를 실시간으로 조회하고 견적을 발행할 수 있는 B2B 웹 시스템입니다.
 
-[과업 범위]
-1. 수행 범위
-- 기획: 운임 산출 로직 설계, UI/UX 설계 (User/Admin)
-- 디자인: 해외 유저 타겟의 영문 웹 디자인
-- 개발: 프론트엔드, 백엔드, AI 파싱 모듈, DB 구축
-- 테스트: 운임 산출 정확도 검증 및 배포
+## 1. 구현 목표와 반영 내용
 
-2. 상세 기능 요구 사항 :
-2-1. 회원 관리 (User & Admin)
-- 해외 에이전트 회원가입 (기업정보 입력) 및 관리자 승인 프로세스
-- 회원 등급 관리 (등급별 요율/할인율 차등 적용 기능)
-- 관리자 권한 관리 (조회용/운영용 등)
-2-2. 내륙운송 견적 조회 (Core Logic)
-- 화물 정보 입력: 포장 개수, 총 중량, 총 부피(CBM), 개별 화물 사이즈(가로/세로/높이)
-- 주소지 입력: 영문 주소 검색 및 우편번호 연동 (Google Maps API 등 활용)
-- 운임 산출 로직 (중요):
-a. 관리자가 업로드한 엑셀 요율표(Tariff) 기반 계산
-b. 차량 제원 DB(톤수별 적재 중량 및 적재함 규격 L/W/H) 구축
-c. 화물 사이즈가 차량 규격을 초과할 경우 상위 차종 자동 매칭 로직
-d. LCL vs 독차 비교 로직 및 할증(Overweight/Size) 자동 계산
-- 환율 적용: 관리자 설정 환율 실시간 반영
-2-3. AI 기반 자동 입력 (Optional but Preferred)
-- 이메일/메신저 텍스트 복사 붙여넣기 시, AI(LLM)가 화물 정보/주소 자동 추출 및 필드 입력
-- 사용자 수정/확인 인터페이스 제공
-2-4. 결과물 및 관리 :
-- PDF 견적서 생성 및 다운로드 (견적 번호 부여)
-- 관리자 대시보드: 에이전트별 접속/견적 통계, 기간별 리포트
+기존 과업 요구사항을 기준으로 아래 항목을 실제 동작 가능한 형태로 구현했습니다.
 
-3. 비기능적 요구사항 :
-3-1. 언어: 사용자 페이지(영문), 관리자 페이지(국문/영문 선택 또는 국문)
-3-2. 확장성: 추후 수출 견적 및 외부 API 연동을 고려한 아키텍처 설계
+- `React + Tailwind` 기반 FE (반응형)
+- `FastAPI + PostgreSQL` 기반 BE/DB
+- `JWT 인증` 및 시드 사용자 3명
+- 운임 계산 핵심 로직
+  - 차량 제원 기반 자동 차종 매칭
+  - LCL vs FTL 자동 비교
+  - 중량/사이즈 할증
+  - 회원 등급 할인
+  - 환율 반영(USD -> KRW)
+- 목록형 화면은 `AG Grid Community` 적용
+- `Docker Compose`로 전체 서비스 일괄 실행
+- `Mermaid Flow`, `ERD`, 주요 화면 5장 캡처 포함
 
-[지원 디바이스 및 디자인]
-1. 지원 디바이스
-- PC Web (주 사용), Mobile Web (반응형 지원)
+## 2. 기술 스택
 
-2. 디자인 가이드
-- 해외 물류 플랫폼(Flexport 등)과 유사한 깔끔하고 전문적인 B2B 스타일
+- Frontend: React 19, Vite, Tailwind CSS, AG Grid Community, React Router
+- Backend: FastAPI, SQLAlchemy, JWT(python-jose), Passlib
+- Database: PostgreSQL 16
+- Infra: Docker, Docker Compose, Nginx
 
-[기술 스택]
-Frontend: React.js, Vue.js 등
-Backend: Python(Django/FastAPI), Node.js, Java 등 제안 가능
-DB: RDBMS (PostgreSQL, MySQL 등)
-AI: OpenAI API 등 상용 LLM 활용 가능
+## 3. 시스템 아키텍처
+
+```mermaid
+flowchart LR
+  U[Agent/Admin Browser] --> N[Nginx Frontend :9000]
+  N -->|SPA| F[React + Tailwind]
+  N -->|/api proxy| B[FastAPI :8000]
+  B --> D[(PostgreSQL)]
+  B --> S[Pricing Engine\nVehicle Match\nLCL/FTL Compare]
+```
+
+## 4. 운임 계산 Flow (Mermaid)
+
+```mermaid
+flowchart TD
+  A[입력: 패키지/중량/CBM/LWH/도착지] --> B[차량 제원 조회]
+  B --> C{적재 가능 차량 존재?}
+  C -- Yes --> D[최소 적합 차종 선택]
+  C -- No --> E[최대 차종 선택 + 사이즈 할증]
+  D --> F[요율표 조회]
+  E --> F
+  F --> G[LCL 비용 계산]
+  F --> H[FTL 비용 계산]
+  G --> I{최소 비용 선택}
+  H --> I
+  I --> J[중량/사이즈 할증 반영]
+  J --> K[회원 등급 할인 반영]
+  K --> L[환율(USD->KRW) 반영]
+  L --> M[견적 번호 발행 및 저장]
+```
+
+## 5. ERD (Mermaid)
+
+```mermaid
+erDiagram
+  USERS ||--o{ QUOTES : creates
+  VEHICLE_SPECS ||--o{ TARIFF_RATES : references
+  VEHICLE_SPECS ||--o{ QUOTES : assigned
+
+  USERS {
+    int id PK
+    string email
+    string full_name
+    string company_name
+    string role
+    string tier
+    boolean is_active
+    string hashed_password
+    datetime created_at
+  }
+
+  VEHICLE_SPECS {
+    int id PK
+    string vehicle_name
+    float tonnage
+    float max_weight_kg
+    float load_length_cm
+    float load_width_cm
+    float load_height_cm
+    boolean active
+  }
+
+  TARIFF_RATES {
+    int id PK
+    string origin
+    string destination_region
+    int vehicle_spec_id FK
+    float base_price_usd
+    float lcl_price_usd_per_cbm
+    float overweight_surcharge_usd_per_ton
+    float size_surcharge_pct
+  }
+
+  EXCHANGE_RATES {
+    int id PK
+    string currency
+    float rate_to_krw
+    datetime updated_at
+  }
+
+  QUOTES {
+    int id PK
+    string quote_no
+    int user_id FK
+    string origin
+    string destination_region
+    string destination_address
+    int package_count
+    float total_weight_kg
+    float total_cbm
+    float cargo_length_cm
+    float cargo_width_cm
+    float cargo_height_cm
+    int recommended_vehicle_id FK
+    string service_mode
+    float subtotal_usd
+    float surcharge_usd
+    float discount_usd
+    float final_usd
+    float final_krw
+    json pricing_breakdown
+    string status
+    datetime created_at
+  }
+```
+
+## 6. 주요 기능
+
+### 6.1 회원/인증
+
+- JWT 기반 로그인
+- 시드 사용자 3명 (Admin 1, Agent 2)
+- 권한 분기
+  - Admin: 전체 견적, 사용자 관리 화면 접근
+  - User: 본인 견적만 조회
+
+### 6.2 견적 Core Logic
+
+- 화물 정보 입력 기반 자동 견적 발행
+- 차량 적재 가능 여부 판정
+- 요율표 기반 FTL/LCL 자동 비교
+- 중량/사이즈 할증 및 등급 할인 적용
+- 환율 반영 KRW 금액 동시 제공
+
+### 6.3 선택 기능 (AI 입력 대체 경량 구현)
+
+- `/api/quotes/parse-text` 엔드포인트
+- 이메일/메신저 텍스트를 붙여넣으면 견적 입력 필드 초안 파싱
+
+## 7. 주요 화면 캡처 (5장)
+
+### 7.1 Dashboard
+
+![Dashboard](captures/01-dashboard.png)
+
+### 7.2 Quote List (AG Grid)
+
+![Quote List](captures/02-quotes-grid.png)
+
+### 7.3 New Quote + Result
+
+![New Quote Result](captures/03-new-quote-result.png)
+
+### 7.4 Admin Users (AG Grid)
+
+![Admin Users](captures/04-admin-users-grid.png)
+
+### 7.5 Tariff Matrix (AG Grid)
+
+![Tariff Matrix](captures/05-tariff-grid.png)
+
+## 8. 실행 방법 (Docker)
+
+### 8.1 시작
+
+```bash
+docker compose up -d --build
+```
+
+### 8.2 접속 URL
+
+- Frontend: http://localhost:9000
+- Backend API: http://localhost:8000
+- API Docs(Swagger): http://localhost:8000/docs
+
+### 8.3 기본 계정 (JWT)
+
+- Admin
+  - email: `admin@inquiry.local`
+  - password: `Admin123!`
+- Agent A
+  - email: `agent.alpha@globalfreight.com`
+  - password: `Agent123!`
+- Agent B
+  - email: `agent.beta@oceangate.com`
+  - password: `Agent123!`
+
+### 8.4 종료
+
+```bash
+docker compose down
+```
+
+데이터까지 제거하려면:
+
+```bash
+docker compose down -v
+```
+
+### 8.5 화면 캡처 재생성
+
+```bash
+docker run --rm --network host -v "$PWD":/work -w /work \
+  mcr.microsoft.com/playwright:v1.58.2-jammy \
+  bash -lc "cd /tmp && npm init -y >/dev/null 2>&1 && npm install playwright@1.58.2 >/dev/null 2>&1 && NODE_PATH=/tmp/node_modules node /work/scripts/capture-screens.cjs"
+```
+
+## 9. 주요 API 요약
+
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `GET /api/dashboard/summary`
+- `GET /api/quotes`
+- `POST /api/quotes/calculate`
+- `POST /api/quotes/parse-text`
+- `GET /api/reference/vehicles`
+- `GET /api/reference/tariffs`
+- `GET /api/reference/exchange-rate`
+- `GET /api/admin/users` (Admin)
+
+## 10. 프로젝트 구조
+
+```text
+.
+├─ backend/
+│  ├─ app/
+│  │  ├─ core/            # 설정/보안
+│  │  ├─ routers/         # API 라우터
+│  │  ├─ services/        # 견적 계산/파싱 로직
+│  │  ├─ models.py        # SQLAlchemy 모델
+│  │  ├─ schemas.py       # Pydantic 스키마
+│  │  ├─ seed.py          # 시드 데이터
+│  │  └─ main.py          # FastAPI 엔트리
+│  └─ Dockerfile
+├─ src/                   # React + Tailwind FE
+├─ nginx/default.conf     # SPA + /api reverse proxy
+├─ docker-compose.yml
+├─ Dockerfile.frontend
+└─ captures/              # 주요 화면 캡처 5장
+```
