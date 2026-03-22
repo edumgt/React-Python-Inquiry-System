@@ -3,7 +3,17 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install
+
+# AIRGAP=1: use offline npm cache pre-seeded by scripts/airgap-save.sh
+#   Build with: docker build --build-arg AIRGAP=1 \
+#               --build-context npmcache=./npm-offline-cache ...
+# AIRGAP=0 (default): install from npm registry as normal
+ARG AIRGAP=0
+RUN if [ "$AIRGAP" = "1" ]; then \
+      npm ci --prefer-offline --cache /npm-cache; \
+    else \
+      npm install; \
+    fi
 
 COPY . .
 RUN npm run build

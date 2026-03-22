@@ -17,6 +17,7 @@ services:
   backend:
     build:
       context: ./backend
+    image: inquiry-backend
     container_name: inquiry-backend
     environment:
       DATABASE_URL: postgresql+psycopg://inquiry:inquiry@db:5432/inquiry
@@ -37,6 +38,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    image: inquiry-frontend
     container_name: inquiry-frontend
     depends_on:
       backend:

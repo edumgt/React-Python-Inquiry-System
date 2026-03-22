@@ -22,6 +22,7 @@ export default function NewQuotePage() {
   );
   const [tariffs, setTariffs] = useState([]);
   const [result, setResult] = useState(null);
+  const [parseDisclaimer, setParseDisclaimer] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -69,6 +70,7 @@ export default function NewQuotePage() {
 
   const onParse = async () => {
     setError('');
+    setParseDisclaimer('');
     setParsing(true);
     try {
       const parsed = await apiRequest('/quotes/parse-text', {
@@ -76,10 +78,14 @@ export default function NewQuotePage() {
         body: JSON.stringify({ raw_text: rawText }),
       }, token);
 
+      const { legal_disclaimer, ...fields } = parsed;
       setForm((prev) => ({
         ...prev,
-        ...parsed,
+        ...fields,
       }));
+      if (legal_disclaimer) {
+        setParseDisclaimer(legal_disclaimer);
+      }
     } catch (err) {
       setError(err.message || 'Auto parse failed');
     } finally {
@@ -111,6 +117,11 @@ export default function NewQuotePage() {
           >
             {parsing ? 'Parsing...' : 'Parse Text Into Fields'}
           </button>
+          {parseDisclaimer && (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              ⚠️ {parseDisclaimer}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
