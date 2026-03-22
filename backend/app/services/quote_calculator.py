@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.core.legal import PARSE_TEXT_DISCLAIMER
 from app.models import ExchangeRate, TariffRate, User, VehicleSpec
 
 
@@ -94,6 +95,7 @@ def parse_cargo_text(raw_text: str) -> dict:
         'cargo_width_cm': cargo_width_cm,
         'cargo_height_cm': cargo_height_cm,
         'confidence': confidence,
+        'legal_disclaimer': PARSE_TEXT_DISCLAIMER,
     }
 
 

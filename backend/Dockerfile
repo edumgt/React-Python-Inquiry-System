@@ -6,7 +6,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Copy pre-downloaded wheels directory (populated by scripts/airgap-save.sh for AIRGAP=1 builds)
+COPY vendor/ /app/vendor/
+
+# AIRGAP=1: install from pre-downloaded wheels in backend/vendor/ (no network required)
+# AIRGAP=0 (default): install from PyPI as normal
+ARG AIRGAP=0
+RUN if [ "$AIRGAP" = "1" ]; then \
+      pip install --no-cache-dir --no-index --find-links=/app/vendor -r /app/requirements.txt; \
+    else \
+      pip install --no-cache-dir -r /app/requirements.txt; \
+    fi
 
 COPY app /app/app
 

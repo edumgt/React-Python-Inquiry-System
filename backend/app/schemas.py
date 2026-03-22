@@ -86,6 +86,7 @@ class QuoteParseResponse(BaseModel):
     cargo_width_cm: float
     cargo_height_cm: float
     confidence: float
+    legal_disclaimer: str
 
 
 class QuoteResponse(BaseModel):
